@@ -1,0 +1,9 @@
+{
+  "name": "extapi",
+  "version": "0.1.0",
+  "description": "Integrate with Jira, Bitbucket, Slack, Gmail, Google Drive, and Google Calendar through a local authenticated proxy. Keeps credentials away from the agent — all requests are pre-authenticated.",
+  "author": {
+    "name": "dev-and-test"
+  },
+  "keywords": ["jira", "bitbucket", "slack", "gmail", "gdrive", "gcalendar", "api", "proxy"]
+}

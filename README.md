@@ -184,9 +184,33 @@ POST /jira/passthrough
 
 ## Teaching AI agents to use extapi
 
-The repository includes a skill file at `.claude/skills/extapi.md` that documents every endpoint, parameter, and includes curl examples. To teach another AI agent how to use this API, copy the skill file into your project's skills directory. Once present, your agent will automatically know how to call all extapi endpoints without needing credentials — it just sends requests to the local proxy.
+This repo ships a skill and a cowork plugin so that Claude (and other agents) can discover and use the API automatically.
 
-> Make sure that you have the right port number in your skill file when you're running multiple instances. The skill has the default port number hard-coded at the moment.
+> Make sure that you have the right port number in your skill/plugin files when you're running multiple instances. The default port `11583` is hard-coded in the reference docs.
+
+### Claude Code — skill file
+
+The `.claude/skills/extapi.md` file documents every endpoint with curl examples. Copy it into any project's skills directory:
+
+```bash
+mkdir -p your-project/.claude/skills
+cp /path/to/agent-ext-api/.claude/skills/extapi.md your-project/.claude/skills/
+```
+
+Claude Code will automatically pick it up and know how to call all extapi endpoints.
+
+### Claude Cowork — plugin
+
+The `cowork-plugin/` directory is a ready-to-install Cowork plugin. To install it, open Claude Desktop and use the plugin manager to add a local plugin pointing at the `cowork-plugin/` directory. Alternatively, copy it manually:
+
+```bash
+# macOS
+cp -r /path/to/agent-ext-api/cowork-plugin ~/.claude/plugins/local/extapi
+
+# Then restart Claude Desktop to pick up the plugin
+```
+
+Once installed, the `extapi-endpoints` skill will be available in all Cowork sessions — Claude will know how to call Jira, Bitbucket, Slack, Gmail, Google Drive, and Google Calendar through the proxy without any extra prompting.
 
 ## Development
 
