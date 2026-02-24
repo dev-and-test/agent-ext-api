@@ -1,8 +1,8 @@
-# extapi
+# External APIs for Agents
 
-Authenticated proxy API for enterprise SaaS tools, developed primarily to keep credentials and secrets away from AI agents while still allowing them to integrate with external APIs and services.
+Authenticated proxy API developed primarily to keep credentials and secrets away from AI agents while still allowing them to integrate with external APIs and services.
 
-extapi sits between your agents (or any application) and upstream APIs (Jira, Bitbucket, Slack, Gmail, Google Drive, Google Calendar), handling authentication so that API tokens, passwords, and OAuth credentials never need to be exposed to the calling agent. It provides a uniform interface with structured logging and safety features like dry-run deletes.
+This API sits between your agents (or any application) and upstream APIs (Jira, Bitbucket, Slack, Gmail, Google Drive, Google Calendar), handling authentication so that API tokens, passwords, and OAuth credentials never need to be exposed to the calling agent. As long as your agents don't have access to the directory where you have the environment variables for thsi project, you're offered some (better than nothing) protection against prompt injection attacks that might steal your tokens and keys. Your data can still be exfiltrated, but you won't be giving someone more than a one time data dump.
 
 ## Supported services
 
@@ -163,14 +163,7 @@ POST /jira/passthrough
 
 ## Teaching AI agents to use extapi
 
-The repository includes a Claude Code skill file at `.claude/skills/extapi.md` that documents every endpoint, parameter, and includes curl examples. To teach another AI agent how to use this API, copy the skill file into your project's `.claude/skills/` directory:
-
-```bash
-mkdir -p .claude/skills
-cp /path/to/agent-ext-api/.claude/skills/extapi.md .claude/skills/
-```
-
-Once present, Claude Code (and any agent using Claude Code skills) will automatically know how to call all extapi endpoints without needing credentials — it just sends requests to the local proxy.
+The repository includes a skill file at `.claude/skills/extapi.md` that documents every endpoint, parameter, and includes curl examples. To teach another AI agent how to use this API, copy the skill file into your project's skills directory. Once present, your agent will automatically know how to call all extapi endpoints without needing credentials — it just sends requests to the local proxy.
 
 ## Development
 
