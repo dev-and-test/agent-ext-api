@@ -18,10 +18,12 @@ from extapi.settings import Settings
 
 setup_logging()
 
+_env_file: str | None = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    settings = Settings()
+    settings = Settings(_env_file=_env_file) if _env_file else Settings()
     app.state.settings = settings
     app.state.jira_client = make_jira_client(settings)
     app.state.bitbucket_client = make_bitbucket_client(settings)

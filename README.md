@@ -2,7 +2,10 @@
 
 Authenticated proxy API developed primarily to keep credentials and secrets away from AI agents while still allowing them to integrate with external APIs and services.
 
-This API sits between your agents (or any application) and upstream APIs (Jira, Bitbucket, Slack, Gmail, Google Drive, Google Calendar), handling authentication so that API tokens, passwords, and OAuth credentials never need to be exposed to the calling agent. As long as your agents don't have access to the directory where you have the environment variables for thsi project, you're offered some (better than nothing) protection against prompt injection attacks that might steal your tokens and keys. Your data can still be exfiltrated, but you won't be giving someone more than a one time data dump.
+This API sits between your agents (or any application) and upstream APIs (Jira, Bitbucket, Slack, Gmail, Google Drive, Google Calendar), handling authentication so that API tokens, passwords, and OAuth credentials never need to be exposed to the calling agent.
+
+## Security argument
+As long as your agents don't have access to the directory where you have the environment variables for this API, you're offered some (better than nothing) protection against prompt injection attacks that might steal your tokens and keys. Your data can still be exfiltrated, but you won't be giving someone more than a one time data dump.
 
 ## Supported services
 
@@ -31,6 +34,9 @@ export EXTAPI_GOOGLE_ACCESS_TOKEN=ya29...
 
 # Start the server (defaults to 127.0.0.1:11583)
 uv run extapi
+
+# Or load settings from a .env file
+uv run extapi --env-file .env
 ```
 
 ### Installing as a dependency
@@ -67,23 +73,38 @@ parent_app.mount("/proxy", app)
 
 ### Running multiple instances with different credentials
 
-Each instance reads from `EXTAPI_*` environment variables, so you can run multiple instances on different ports with different credentials:
+Use `--env-file` to point each instance at its own `.env` file:
 
 ```bash
-# Instance 1 — Team A's Jira + Slack
-EXTAPI_PORT=11001 \
-EXTAPI_JIRA_USER_EMAIL=team-a@company.com \
-EXTAPI_JIRA_API_TOKEN=token-a \
-EXTAPI_SLACK_BOT_TOKEN=xoxb-team-a \
-  extapi &
-
-# Instance 2 — Team B's Jira + Slack
-EXTAPI_PORT=11002 \
-EXTAPI_JIRA_USER_EMAIL=team-b@company.com \
-EXTAPI_JIRA_API_TOKEN=token-b \
-EXTAPI_SLACK_BOT_TOKEN=xoxb-team-b \
-  extapi &
+# team-a.env
+EXTAPI_PORT=11001
+EXTAPI_JIRA_USER_EMAIL=team-a@company.com
+EXTAPI_JIRA_API_TOKEN=token-a
+EXTAPI_SLACK_BOT_TOKEN=xoxb-team-a
 ```
+
+```bash
+# team-b.env
+EXTAPI_PORT=11002
+EXTAPI_JIRA_USER_EMAIL=team-b@company.com
+EXTAPI_JIRA_API_TOKEN=token-b
+EXTAPI_SLACK_BOT_TOKEN=xoxb-team-b
+```
+
+```bash
+extapi --env-file team-a.env &
+extapi --env-file team-b.env &
+```
+
+The same works programmatically:
+
+```python
+from extapi import serve
+
+serve(env_file="team-a.env")
+```
+
+Environment variables still work and take precedence over values in the env file, so you can use `--env-file` for the base config and override individual values with env vars if needed.
 
 ## Configuration
 
@@ -164,6 +185,8 @@ POST /jira/passthrough
 ## Teaching AI agents to use extapi
 
 The repository includes a skill file at `.claude/skills/extapi.md` that documents every endpoint, parameter, and includes curl examples. To teach another AI agent how to use this API, copy the skill file into your project's skills directory. Once present, your agent will automatically know how to call all extapi endpoints without needing credentials — it just sends requests to the local proxy.
+
+> Make sure that you have the right port number in your skill file when you're running multiple instances. The skill has the default port number hard-coded at the moment.
 
 ## Development
 
