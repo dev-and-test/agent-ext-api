@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from extapi.dry_run import maybe_block_delete
+from extapi.gate import gate, gate_passthrough
 from extapi.models.passthrough import PassthroughRequest
 from extapi.services import gmail as gmail_svc
 
@@ -48,6 +48,7 @@ async def get_attachment(message_id: str, attachment_id: str, request: Request):
 
 
 @router.post("/drafts")
+@gate("gmail", "POST", "/gmail/v1/users/me/drafts")
 async def create_draft(request: Request):
     body = await request.json()
     client = request.app.state.gmail_client
@@ -57,11 +58,8 @@ async def create_draft(request: Request):
 
 
 @router.post("/passthrough")
+@gate_passthrough("gmail")
 async def gmail_passthrough(payload: PassthroughRequest, request: Request):
-    if payload.method == "DELETE":
-        blocked = await maybe_block_delete(request, "gmail", payload.path)
-        if blocked:
-            return blocked
     client = request.app.state.gmail_client
     caller_ip = request.client.host if request.client else None
     upstream = await gmail_svc.passthrough(

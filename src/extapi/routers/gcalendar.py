@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from extapi.dry_run import maybe_block_delete
+from extapi.gate import gate, gate_passthrough
 from extapi.models.passthrough import PassthroughRequest
 from extapi.services import gcalendar as gcalendar_svc
 
@@ -48,6 +48,7 @@ async def get_event(calendar_id: str, event_id: str, request: Request):
 
 
 @router.post("/calendars/{calendar_id}/events")
+@gate("gcalendar", "POST", "/calendar/v3/calendars/{calendar_id}/events")
 async def create_event(calendar_id: str, request: Request):
     body = await request.json()
     client = request.app.state.gcalendar_client
@@ -57,6 +58,7 @@ async def create_event(calendar_id: str, request: Request):
 
 
 @router.patch("/events/{calendar_id}/{event_id}")
+@gate("gcalendar", "PATCH", "/calendar/v3/calendars/{calendar_id}/events/{event_id}")
 async def update_event(calendar_id: str, event_id: str, request: Request):
     body = await request.json()
     client = request.app.state.gcalendar_client
@@ -68,11 +70,8 @@ async def update_event(calendar_id: str, event_id: str, request: Request):
 
 
 @router.delete("/events/{calendar_id}/{event_id}")
+@gate("gcalendar", "DELETE", "/calendar/v3/calendars/{calendar_id}/events/{event_id}")
 async def delete_event(calendar_id: str, event_id: str, request: Request):
-    path = f"/calendar/v3/calendars/{calendar_id}/events/{event_id}"
-    blocked = await maybe_block_delete(request, "gcalendar", path)
-    if blocked:
-        return blocked
     client = request.app.state.gcalendar_client
     caller_ip = request.client.host if request.client else None
     upstream = await gcalendar_svc.delete_event(
@@ -82,11 +81,8 @@ async def delete_event(calendar_id: str, event_id: str, request: Request):
 
 
 @router.post("/passthrough")
+@gate_passthrough("gcalendar")
 async def gcalendar_passthrough(payload: PassthroughRequest, request: Request):
-    if payload.method == "DELETE":
-        blocked = await maybe_block_delete(request, "gcalendar", payload.path)
-        if blocked:
-            return blocked
     client = request.app.state.gcalendar_client
     caller_ip = request.client.host if request.client else None
     upstream = await gcalendar_svc.passthrough(

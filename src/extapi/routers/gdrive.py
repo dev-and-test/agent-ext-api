@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from extapi.dry_run import maybe_block_delete
+from extapi.gate import gate, gate_passthrough
 from extapi.models.passthrough import PassthroughRequest
 from extapi.services import gdrive as gdrive_svc
 
@@ -48,6 +48,7 @@ async def download_file(file_id: str, request: Request):
 
 
 @router.post("/files")
+@gate("gdrive", "POST", "/drive/v3/files")
 async def create_file(request: Request):
     body = await request.json()
     client = request.app.state.gdrive_client
@@ -57,6 +58,7 @@ async def create_file(request: Request):
 
 
 @router.patch("/files/{file_id}")
+@gate("gdrive", "PATCH", "/drive/v3/files/{file_id}")
 async def update_file(file_id: str, request: Request):
     body = await request.json()
     client = request.app.state.gdrive_client
@@ -73,11 +75,8 @@ async def update_file(file_id: str, request: Request):
 
 
 @router.post("/passthrough")
+@gate_passthrough("gdrive")
 async def gdrive_passthrough(payload: PassthroughRequest, request: Request):
-    if payload.method == "DELETE":
-        blocked = await maybe_block_delete(request, "gdrive", payload.path)
-        if blocked:
-            return blocked
     client = request.app.state.gdrive_client
     caller_ip = request.client.host if request.client else None
     upstream = await gdrive_svc.passthrough(

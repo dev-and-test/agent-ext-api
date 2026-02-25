@@ -139,6 +139,39 @@ All settings are controlled via environment variables with the `EXTAPI_` prefix.
 | Variable | Default | Description |
 |---|---|---|
 | `EXTAPI_DRY_RUN_DELETES` | `false` | When enabled, all DELETE requests return a dummy response instead of hitting the upstream API |
+| `EXTAPI_REQUIRE_APPROVAL_JIRA` | `""` | Comma-separated HTTP methods that require approval before executing (e.g. `post,put,delete`) |
+| `EXTAPI_REQUIRE_APPROVAL_BITBUCKET` | `""` | Same as above, for Bitbucket |
+| `EXTAPI_REQUIRE_APPROVAL_SLACK` | `""` | Same as above, for Slack |
+| `EXTAPI_REQUIRE_APPROVAL_GMAIL` | `""` | Same as above, for Gmail |
+| `EXTAPI_REQUIRE_APPROVAL_GDRIVE` | `""` | Same as above, for Google Drive |
+| `EXTAPI_REQUIRE_APPROVAL_GCALENDAR` | `""` | Same as above, for Google Calendar |
+| `EXTAPI_REVIEW_DB_PATH` | `extapi_review.db` | Path to the SQLite database used by the review queue |
+
+### Review queue
+
+When approval flags are set, mutating requests are not forwarded to the upstream API immediately. Instead they are stored in a SQLite review queue and the caller receives an HTTP 202 with a `review_id`. A human operator can then inspect, approve, or reject queued items through a set of review endpoints.
+
+Approving an item replays the original request against the upstream API and records the response. Rejecting an item marks it as rejected without making any upstream call.
+
+This gives you per-service, per-method control. For example, you can require approval for Jira writes and Gmail deletes while letting Slack messages flow freely:
+
+```bash
+EXTAPI_REQUIRE_APPROVAL_JIRA=post,put,delete
+EXTAPI_REQUIRE_APPROVAL_GMAIL=delete
+# EXTAPI_REQUIRE_APPROVAL_SLACK is unset — no approval needed
+```
+
+`EXTAPI_DRY_RUN_DELETES` still works and takes precedence — when it is enabled, DELETEs are blocked immediately without being queued.
+
+#### Review endpoints
+
+```
+GET    /review/queue                      # List items (filter: ?status=pending|approved|rejected&service=jira)
+GET    /review/queue/{id}                 # Get a single item
+POST   /review/queue/{id}/approve         # Approve and execute the upstream request
+POST   /review/queue/{id}/reject          # Reject without executing
+DELETE /review/queue/{id}                 # Remove from the queue
+```
 
 ## API overview
 

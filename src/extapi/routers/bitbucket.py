@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from extapi.dry_run import maybe_block_delete
+from extapi.gate import gate, gate_passthrough
 from extapi.models.passthrough import PassthroughRequest
 from extapi.services import bitbucket as bb_svc
 
@@ -45,6 +45,7 @@ async def list_pullrequests(workspace: str, repo_slug: str, request: Request):
 
 
 @router.post("/repos/{workspace}/{repo_slug}/pullrequests")
+@gate("bitbucket", "POST", "/repositories/{workspace}/{repo_slug}/pullrequests")
 async def create_pullrequest(workspace: str, repo_slug: str, request: Request):
     body = await request.json()
     client = request.app.state.bitbucket_client
@@ -65,6 +66,7 @@ async def get_pullrequest(
 
 
 @router.put("/repos/{workspace}/{repo_slug}/pullrequests/{pr_id}")
+@gate("bitbucket", "PUT", "/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}")
 async def update_pullrequest(
     workspace: str, repo_slug: str, pr_id: int, request: Request
 ):
@@ -78,6 +80,7 @@ async def update_pullrequest(
 
 
 @router.post("/repos/{workspace}/{repo_slug}/pullrequests/{pr_id}/merge")
+@gate("bitbucket", "POST", "/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/merge")
 async def merge_pullrequest(
     workspace: str, repo_slug: str, pr_id: int, request: Request
 ):
@@ -91,11 +94,8 @@ async def merge_pullrequest(
 
 
 @router.post("/passthrough")
+@gate_passthrough("bitbucket")
 async def bitbucket_passthrough(payload: PassthroughRequest, request: Request):
-    if payload.method == "DELETE":
-        blocked = await maybe_block_delete(request, "bitbucket", payload.path)
-        if blocked:
-            return blocked
     client = request.app.state.bitbucket_client
     caller_ip = request.client.host if request.client else None
     upstream = await bb_svc.passthrough(

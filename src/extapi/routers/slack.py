@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from extapi.dry_run import maybe_block_delete
+from extapi.gate import gate, gate_passthrough
 from extapi.models.passthrough import PassthroughRequest
 from extapi.services import slack as slack_svc
 
@@ -17,6 +17,7 @@ def _forward(upstream) -> Response:
 
 
 @router.post("/messages")
+@gate("slack", "POST", "/chat.postMessage")
 async def post_message(request: Request):
     body = await request.json()
     client = request.app.state.slack_client
@@ -62,11 +63,8 @@ async def list_channels(request: Request):
 
 
 @router.post("/passthrough")
+@gate_passthrough("slack")
 async def slack_passthrough(payload: PassthroughRequest, request: Request):
-    if payload.method == "DELETE":
-        blocked = await maybe_block_delete(request, "slack", payload.path)
-        if blocked:
-            return blocked
     client = request.app.state.slack_client
     caller_ip = request.client.host if request.client else None
     upstream = await slack_svc.passthrough(
