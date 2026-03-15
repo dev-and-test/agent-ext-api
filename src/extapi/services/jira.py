@@ -66,7 +66,7 @@ async def get_changelog(
 async def search(
     client: httpx.AsyncClient, body: dict, caller_ip: str | None = None
 ) -> httpx.Response:
-    path = "/rest/api/3/search"
+    path = "/rest/api/3/search/jql"
     resp = await client.post(path, json=body)
     await _log_mutation("POST", path, resp, caller_ip)
     return resp

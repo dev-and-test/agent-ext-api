@@ -64,7 +64,7 @@ async def get_changelog(issue_key: str, request: Request):
     return _forward(upstream)
 
 
-@router.post("/search")
+@router.post("/search/jql")
 async def search(request: Request):
     body = await request.json()
     client = request.app.state.jira_client

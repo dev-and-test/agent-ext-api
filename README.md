@@ -249,7 +249,7 @@ POST   /jira/issues
 GET    /jira/issues/{key}
 PUT    /jira/issues/{key}
 DELETE /jira/issues/{key}
-POST   /jira/search
+POST   /jira/search/jql
 ...
 POST   /jira/passthrough
 

@@ -62,8 +62,8 @@ async def test_get_changelog(client):
 @pytest.mark.asyncio
 async def test_search(client):
     c, mock = client
-    mock.post(f"{JIRA}/rest/api/3/search").respond(200, json={"issues": []})
-    resp = await c.post("/jira/search", json={"jql": "project = PROJ"})
+    mock.post(f"{JIRA}/rest/api/3/search/jql").respond(200, json={"issues": []})
+    resp = await c.post("/jira/search/jql", json={"jql": "project = PROJ"})
     assert resp.status_code == 200
     assert resp.json()["issues"] == []
 

@@ -31,14 +31,14 @@ GET /health → {"status": "ok"}
 | POST | `/jira/issues/{issue_key}/comments` | — | JSON (comment body) | Add comment |
 | PUT | `/jira/issues/{issue_key}/comments/{comment_id}` | — | JSON (comment body) | Update comment |
 | DELETE | `/jira/issues/{issue_key}/comments/{comment_id}` | — | — | Delete comment |
-| POST | `/jira/search` | — | JSON (`{"jql": "...", ...}`) | Search issues via JQL |
+| POST | `/jira/search/jql` | — | JSON (`{"jql": "...", ...}`) | Search issues via JQL |
 | POST | `/jira/passthrough` | — | PassthroughRequest | Arbitrary Jira API call |
 
 ### Examples
 
 ```bash
 # Search for open bugs assigned to me
-curl http://127.0.0.1:11583/jira/search \
+curl http://127.0.0.1:11583/jira/search/jql \
   -H 'Content-Type: application/json' \
   -d '{"jql": "assignee = currentUser() AND type = Bug AND status != Done"}'
 
