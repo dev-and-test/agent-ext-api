@@ -1,6 +1,8 @@
 import httpx
 import structlog
 
+from extapi.google_token import auth_headers
+
 logger = structlog.get_logger()
 
 
@@ -18,30 +20,31 @@ async def _log_mutation(
 
 
 async def search_messages(
-    client: httpx.AsyncClient, params: dict | None = None
+    client: httpx.AsyncClient, params: dict | None = None, token: str | None = None
 ) -> httpx.Response:
-    return await client.get("/gmail/v1/users/me/messages", params=params)
+    return await client.get("/gmail/v1/users/me/messages", params=params, headers=auth_headers(token))
 
 
 async def get_message(
-    client: httpx.AsyncClient, message_id: str, params: dict | None = None
+    client: httpx.AsyncClient, message_id: str, params: dict | None = None, token: str | None = None
 ) -> httpx.Response:
-    return await client.get(f"/gmail/v1/users/me/messages/{message_id}", params=params)
+    return await client.get(f"/gmail/v1/users/me/messages/{message_id}", params=params, headers=auth_headers(token))
 
 
 async def get_attachment(
-    client: httpx.AsyncClient, message_id: str, attachment_id: str
+    client: httpx.AsyncClient, message_id: str, attachment_id: str, token: str | None = None
 ) -> httpx.Response:
     return await client.get(
-        f"/gmail/v1/users/me/messages/{message_id}/attachments/{attachment_id}"
+        f"/gmail/v1/users/me/messages/{message_id}/attachments/{attachment_id}",
+        headers=auth_headers(token),
     )
 
 
 async def create_draft(
-    client: httpx.AsyncClient, body: dict, caller_ip: str | None = None
+    client: httpx.AsyncClient, body: dict, caller_ip: str | None = None, token: str | None = None
 ) -> httpx.Response:
     path = "/gmail/v1/users/me/drafts"
-    resp = await client.post(path, json=body)
+    resp = await client.post(path, json=body, headers=auth_headers(token))
     await _log_mutation("POST", path, resp, caller_ip)
     return resp
 
@@ -53,8 +56,9 @@ async def passthrough(
     body: dict | None = None,
     params: dict[str, str] | None = None,
     caller_ip: str | None = None,
+    token: str | None = None,
 ) -> httpx.Response:
-    resp = await client.request(method, path, json=body, params=params)
+    resp = await client.request(method, path, json=body, params=params, headers=auth_headers(token))
     if method != "GET":
         await _log_mutation(method, path, resp, caller_ip)
     return resp

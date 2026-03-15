@@ -13,8 +13,9 @@ from extapi.client import (
     make_slack_client,
 )
 from extapi.logging import setup_logging
+from extapi.google_auth import init_google_auth_db
 from extapi.review_queue import init_db
-from extapi.routers import bitbucket, gcalendar, gdrive, gmail, health, jira, review, slack
+from extapi.routers import bitbucket, gcalendar, gdrive, gmail, google_auth, health, jira, review, slack
 from extapi.settings import Settings
 
 setup_logging()
@@ -33,7 +34,9 @@ async def lifespan(app: FastAPI):
     app.state.gdrive_client = make_gdrive_client(settings)
     app.state.gcalendar_client = make_gcalendar_client(settings)
     app.state.review_db = await init_db(settings.review_db_path)
+    app.state.google_auth_db = await init_google_auth_db(settings.google_auth_db_path)
     yield
+    await app.state.google_auth_db.close()
     await app.state.review_db.close()
     await app.state.jira_client.aclose()
     await app.state.bitbucket_client.aclose()
@@ -53,6 +56,7 @@ app.include_router(gmail.router)
 app.include_router(gdrive.router)
 app.include_router(gcalendar.router)
 app.include_router(review.router)
+app.include_router(google_auth.router)
 
 
 @app.exception_handler(httpx.ConnectError)

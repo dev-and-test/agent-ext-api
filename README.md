@@ -14,9 +14,9 @@ As long as your agents don't have access to the directory where you have the env
 | Jira             | Basic (email + API token)    |
 | Bitbucket        | Basic (username + app password) |
 | Slack            | Bearer token                 |
-| Gmail            | Bearer token (Google OAuth)  |
-| Google Drive     | Bearer token (Google OAuth)  |
-| Google Calendar  | Bearer token (Google OAuth)  |
+| Gmail            | Bearer token (Google OAuth) |
+| Google Drive     | Bearer token (Google OAuth) |
+| Google Calendar  | Bearer token (Google OAuth) |
 
 ## Quick start
 
@@ -125,14 +125,22 @@ All settings are controlled via environment variables with the `EXTAPI_` prefix.
 | `EXTAPI_JIRA_USER_EMAIL` | Jira user email |
 | `EXTAPI_JIRA_API_TOKEN` | Jira API token |
 | `EXTAPI_BITBUCKET_BASE_URL` | Bitbucket API URL (default: `https://api.bitbucket.org/2.0`) |
-| `EXTAPI_BITBUCKET_USERNAME` | Bitbucket username |
-| `EXTAPI_BITBUCKET_APP_PASSWORD` | Bitbucket app password |
+| `EXTAPI_BITBUCKET_USER_EMAIL` | Bitbucket user email (Atlassian account email) |
+| `EXTAPI_BITBUCKET_API_TOKEN` | Bitbucket API token (scoped) |
 | `EXTAPI_SLACK_BASE_URL` | Slack API URL (default: `https://slack.com/api`) |
 | `EXTAPI_SLACK_BOT_TOKEN` | Slack bot token |
 | `EXTAPI_GMAIL_BASE_URL` | Gmail API URL (default: `https://gmail.googleapis.com`) |
 | `EXTAPI_GDRIVE_BASE_URL` | Google Drive API URL (default: `https://www.googleapis.com`) |
 | `EXTAPI_GCALENDAR_BASE_URL` | Google Calendar API URL (default: `https://www.googleapis.com`) |
-| `EXTAPI_GOOGLE_ACCESS_TOKEN` | Google OAuth access token (shared by Gmail, Drive, Calendar) |
+| `EXTAPI_GOOGLE_ACCESS_TOKEN` | Google OAuth access token used as fallback (legacy) |
+
+### Google OAuth
+
+| Variable | Default | Description |
+|---|---|---|
+| `EXTAPI_GOOGLE_OAUTH_CLIENT_ID` | `""` | OAuth 2.0 client ID from Google Cloud Console (Desktop app type) |
+| `EXTAPI_GOOGLE_OAUTH_CLIENT_SECRET` | `""` | OAuth 2.0 client secret |
+| `EXTAPI_GOOGLE_AUTH_DB_PATH` | `extapi_google_auth.db` | Path to the SQLite database storing OAuth sessions |
 
 ### Feature flags
 
@@ -173,6 +181,62 @@ POST   /review/queue/{id}/reject          # Reject without executing
 DELETE /review/queue/{id}                 # Remove from the queue
 ```
 
+### Google OAuth
+
+The previous `EXTAPI_GOOGLE_ACCESS_TOKEN` approach required a lot of unneccesary configuration outside this application to get the token. With the new approach, the application handles the full OAuth 2.0 flow, stores sessions in SQLite, and automatically refreshes tokens before they expire, leaving the setup relatively straight forward (this is as straight forward as google will allow (-_-) ).
+
+Although it is not the typical use case, the new setup allows for different users to use their own, separate Google accounts with the same API server. Without the header, the legacy `EXTAPI_GOOGLE_ACCESS_TOKEN` is used as a fallback, so existing integrations continue to work unchanged.
+
+#### Setup
+
+1. Create an OAuth 2.0 client in the [Google Cloud Console](https://console.cloud.google.com/apis/credentials) (type: **Desktop app**).
+2. Enable the Gmail, Drive, and Calendar APIs for your project.
+3. Set the env vars:
+
+```bash
+EXTAPI_GOOGLE_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
+EXTAPI_GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
+```
+
+#### Auth flow
+
+```bash
+# 1. Get the Google consent URL
+curl http://localhost:11583/google/auth/login
+# → {"auth_url": "https://accounts.google.com/o/oauth2/v2/auth?..."}
+
+# 2. Open the URL in a browser and complete consent.
+#    Google displays an authorization code on screen. Copy it.
+
+# 3. Send the code to the callback endpoint
+curl -X POST http://localhost:11583/google/auth/callback \
+  -H "Content-Type: application/json" \
+  -d '{"code": "4/0AbC..."}'
+# → {"session_id": "abc123...", "user_email": "user@company.com", "expires_at": "..."}
+
+# 4. Use the session on any Google endpoint
+curl -H "X-Google-Session-Id: abc123..." http://localhost:11583/gmail/messages
+curl -H "X-Google-Session-Id: abc123..." http://localhost:11583/gdrive/files
+curl -H "X-Google-Session-Id: abc123..." http://localhost:11583/gcalendar/calendars
+
+# 5. Check session info
+curl http://localhost:11583/google/auth/session/abc123...
+
+# 6. Logout (delete session)
+curl -X DELETE http://localhost:11583/google/auth/session/abc123...
+```
+
+#### Auth endpoints
+
+```
+GET    /google/auth/login                 # Returns {"auth_url": "..."} for Google consent screen
+POST   /google/auth/callback              # Exchanges auth code for tokens, creates session (body: {"code": "..."})
+GET    /google/auth/session/{id}          # Session info (email, expiry, scopes) — no tokens exposed
+DELETE /google/auth/session/{id}          # Delete session (logout)
+```
+
+Requested scopes: `gmail.modify`, `drive`, `calendar`.
+
 ## API overview
 
 Each service exposes typed endpoints for common operations plus a generic passthrough:
@@ -202,6 +266,13 @@ GET    /slack/channels/{id}/history
 POST   /slack/passthrough
 
 # Gmail, Google Drive, Google Calendar — similar pattern
+# All support optional X-Google-Session-Id header for simpler auth
+
+# Google OAuth
+GET    /google/auth/login
+POST   /google/auth/callback
+GET    /google/auth/session/{id}
+DELETE /google/auth/session/{id}
 ```
 
 The passthrough endpoint accepts any method/path combination:

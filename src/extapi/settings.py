@@ -16,8 +16,8 @@ class Settings(BaseSettings):
 
     # Bitbucket
     bitbucket_base_url: str = "https://api.bitbucket.org/2.0"
-    bitbucket_username: str = ""
-    bitbucket_app_password: str = ""
+    bitbucket_user_email: str = ""
+    bitbucket_api_token: str = ""
 
     # Slack
     slack_base_url: str = "https://slack.com/api"
@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     require_approval_gdrive: str = ""
     require_approval_gcalendar: str = ""
     review_db_path: str = "extapi_review.db"
+
+    # Google OAuth
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    google_auth_db_path: str = "extapi_google_auth.db"
 
     # Pre-parsed lookup table: {service: frozenset[method]}
     _approval_gates: dict[str, frozenset[str]] = {}

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from extapi.gate import gate, gate_passthrough
+from extapi.google_token import get_google_token
 from extapi.models.passthrough import PassthroughRequest
 from extapi.services import gcalendar as gcalendar_svc
 
@@ -19,31 +20,34 @@ def _forward(upstream) -> Response:
 @router.get("/calendars")
 async def list_calendars(request: Request):
     client = request.app.state.gcalendar_client
+    token = await get_google_token(request)
     params = {}
     for key in ("maxResults", "pageToken"):
         val = request.query_params.get(key)
         if val is not None:
             params[key] = val
-    upstream = await gcalendar_svc.list_calendars(client, params or None)
+    upstream = await gcalendar_svc.list_calendars(client, params or None, token=token)
     return _forward(upstream)
 
 
 @router.get("/calendars/{calendar_id}/events")
 async def list_events(calendar_id: str, request: Request):
     client = request.app.state.gcalendar_client
+    token = await get_google_token(request)
     params = {}
     for key in ("q", "timeMin", "timeMax", "maxResults", "pageToken", "singleEvents", "orderBy"):
         val = request.query_params.get(key)
         if val is not None:
             params[key] = val
-    upstream = await gcalendar_svc.list_events(client, calendar_id, params or None)
+    upstream = await gcalendar_svc.list_events(client, calendar_id, params or None, token=token)
     return _forward(upstream)
 
 
 @router.get("/events/{calendar_id}/{event_id}")
 async def get_event(calendar_id: str, event_id: str, request: Request):
     client = request.app.state.gcalendar_client
-    upstream = await gcalendar_svc.get_event(client, calendar_id, event_id)
+    token = await get_google_token(request)
+    upstream = await gcalendar_svc.get_event(client, calendar_id, event_id, token=token)
     return _forward(upstream)
 
 
@@ -52,8 +56,9 @@ async def get_event(calendar_id: str, event_id: str, request: Request):
 async def create_event(calendar_id: str, request: Request):
     body = await request.json()
     client = request.app.state.gcalendar_client
+    token = await get_google_token(request)
     caller_ip = request.client.host if request.client else None
-    upstream = await gcalendar_svc.create_event(client, calendar_id, body, caller_ip)
+    upstream = await gcalendar_svc.create_event(client, calendar_id, body, caller_ip, token=token)
     return _forward(upstream)
 
 
@@ -62,9 +67,10 @@ async def create_event(calendar_id: str, request: Request):
 async def update_event(calendar_id: str, event_id: str, request: Request):
     body = await request.json()
     client = request.app.state.gcalendar_client
+    token = await get_google_token(request)
     caller_ip = request.client.host if request.client else None
     upstream = await gcalendar_svc.update_event(
-        client, calendar_id, event_id, body, caller_ip
+        client, calendar_id, event_id, body, caller_ip, token=token
     )
     return _forward(upstream)
 
@@ -73,9 +79,10 @@ async def update_event(calendar_id: str, event_id: str, request: Request):
 @gate("gcalendar", "DELETE", "/calendar/v3/calendars/{calendar_id}/events/{event_id}")
 async def delete_event(calendar_id: str, event_id: str, request: Request):
     client = request.app.state.gcalendar_client
+    token = await get_google_token(request)
     caller_ip = request.client.host if request.client else None
     upstream = await gcalendar_svc.delete_event(
-        client, calendar_id, event_id, caller_ip
+        client, calendar_id, event_id, caller_ip, token=token
     )
     return _forward(upstream)
 
@@ -84,8 +91,9 @@ async def delete_event(calendar_id: str, event_id: str, request: Request):
 @gate_passthrough("gcalendar")
 async def gcalendar_passthrough(payload: PassthroughRequest, request: Request):
     client = request.app.state.gcalendar_client
+    token = await get_google_token(request)
     caller_ip = request.client.host if request.client else None
     upstream = await gcalendar_svc.passthrough(
-        client, payload.method, payload.path, payload.body, payload.params, caller_ip
+        client, payload.method, payload.path, payload.body, payload.params, caller_ip, token=token
     )
     return _forward(upstream)

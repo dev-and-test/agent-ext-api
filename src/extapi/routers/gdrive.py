@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from extapi.gate import gate, gate_passthrough
+from extapi.google_token import get_google_token
 from extapi.models.passthrough import PassthroughRequest
 from extapi.services import gdrive as gdrive_svc
 
@@ -19,31 +20,34 @@ def _forward(upstream) -> Response:
 @router.get("/files")
 async def list_files(request: Request):
     client = request.app.state.gdrive_client
+    token = await get_google_token(request)
     params = {}
     for key in ("q", "fields", "pageSize", "pageToken", "orderBy"):
         val = request.query_params.get(key)
         if val is not None:
             params[key] = val
-    upstream = await gdrive_svc.list_files(client, params or None)
+    upstream = await gdrive_svc.list_files(client, params or None, token=token)
     return _forward(upstream)
 
 
 @router.get("/files/{file_id}")
 async def get_file(file_id: str, request: Request):
     client = request.app.state.gdrive_client
+    token = await get_google_token(request)
     params = {}
     for key in ("fields",):
         val = request.query_params.get(key)
         if val is not None:
             params[key] = val
-    upstream = await gdrive_svc.get_file(client, file_id, params or None)
+    upstream = await gdrive_svc.get_file(client, file_id, params or None, token=token)
     return _forward(upstream)
 
 
 @router.get("/files/{file_id}/download")
 async def download_file(file_id: str, request: Request):
     client = request.app.state.gdrive_client
-    upstream = await gdrive_svc.download_file(client, file_id)
+    token = await get_google_token(request)
+    upstream = await gdrive_svc.download_file(client, file_id, token=token)
     return _forward(upstream)
 
 
@@ -52,8 +56,9 @@ async def download_file(file_id: str, request: Request):
 async def create_file(request: Request):
     body = await request.json()
     client = request.app.state.gdrive_client
+    token = await get_google_token(request)
     caller_ip = request.client.host if request.client else None
-    upstream = await gdrive_svc.create_file(client, body, caller_ip)
+    upstream = await gdrive_svc.create_file(client, body, caller_ip, token=token)
     return _forward(upstream)
 
 
@@ -62,6 +67,7 @@ async def create_file(request: Request):
 async def update_file(file_id: str, request: Request):
     body = await request.json()
     client = request.app.state.gdrive_client
+    token = await get_google_token(request)
     caller_ip = request.client.host if request.client else None
     params = {}
     for key in ("addParents", "removeParents"):
@@ -69,7 +75,7 @@ async def update_file(file_id: str, request: Request):
         if val is not None:
             params[key] = val
     upstream = await gdrive_svc.update_file(
-        client, file_id, body, params or None, caller_ip
+        client, file_id, body, params or None, caller_ip, token=token
     )
     return _forward(upstream)
 
@@ -78,8 +84,9 @@ async def update_file(file_id: str, request: Request):
 @gate_passthrough("gdrive")
 async def gdrive_passthrough(payload: PassthroughRequest, request: Request):
     client = request.app.state.gdrive_client
+    token = await get_google_token(request)
     caller_ip = request.client.host if request.client else None
     upstream = await gdrive_svc.passthrough(
-        client, payload.method, payload.path, payload.body, payload.params, caller_ip
+        client, payload.method, payload.path, payload.body, payload.params, caller_ip, token=token
     )
     return _forward(upstream)

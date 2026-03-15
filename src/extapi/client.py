@@ -18,7 +18,7 @@ def make_jira_client(settings: Settings) -> httpx.AsyncClient:
 def make_bitbucket_client(settings: Settings) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         base_url=settings.bitbucket_base_url,
-        auth=(settings.bitbucket_username, settings.bitbucket_app_password),
+        auth=(settings.bitbucket_user_email, settings.bitbucket_api_token),
         headers={
             "Accept": "application/json",
             "Content-Type": "application/json",

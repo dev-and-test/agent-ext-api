@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from extapi.gate import gate, gate_passthrough
+from extapi.google_token import get_google_token
 from extapi.models.passthrough import PassthroughRequest
 from extapi.services import gmail as gmail_svc
 
@@ -19,31 +20,34 @@ def _forward(upstream) -> Response:
 @router.get("/messages")
 async def search_messages(request: Request):
     client = request.app.state.gmail_client
+    token = await get_google_token(request)
     params = {}
     for key in ("q", "maxResults", "pageToken", "labelIds"):
         val = request.query_params.get(key)
         if val is not None:
             params[key] = val
-    upstream = await gmail_svc.search_messages(client, params or None)
+    upstream = await gmail_svc.search_messages(client, params or None, token=token)
     return _forward(upstream)
 
 
 @router.get("/messages/{message_id}")
 async def get_message(message_id: str, request: Request):
     client = request.app.state.gmail_client
+    token = await get_google_token(request)
     params = {}
     for key in ("format", "metadataHeaders"):
         val = request.query_params.get(key)
         if val is not None:
             params[key] = val
-    upstream = await gmail_svc.get_message(client, message_id, params or None)
+    upstream = await gmail_svc.get_message(client, message_id, params or None, token=token)
     return _forward(upstream)
 
 
 @router.get("/messages/{message_id}/attachments/{attachment_id}")
 async def get_attachment(message_id: str, attachment_id: str, request: Request):
     client = request.app.state.gmail_client
-    upstream = await gmail_svc.get_attachment(client, message_id, attachment_id)
+    token = await get_google_token(request)
+    upstream = await gmail_svc.get_attachment(client, message_id, attachment_id, token=token)
     return _forward(upstream)
 
 
@@ -52,8 +56,9 @@ async def get_attachment(message_id: str, attachment_id: str, request: Request):
 async def create_draft(request: Request):
     body = await request.json()
     client = request.app.state.gmail_client
+    token = await get_google_token(request)
     caller_ip = request.client.host if request.client else None
-    upstream = await gmail_svc.create_draft(client, body, caller_ip)
+    upstream = await gmail_svc.create_draft(client, body, caller_ip, token=token)
     return _forward(upstream)
 
 
@@ -61,8 +66,9 @@ async def create_draft(request: Request):
 @gate_passthrough("gmail")
 async def gmail_passthrough(payload: PassthroughRequest, request: Request):
     client = request.app.state.gmail_client
+    token = await get_google_token(request)
     caller_ip = request.client.host if request.client else None
     upstream = await gmail_svc.passthrough(
-        client, payload.method, payload.path, payload.body, payload.params, caller_ip
+        client, payload.method, payload.path, payload.body, payload.params, caller_ip, token=token
     )
     return _forward(upstream)
