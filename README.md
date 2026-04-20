@@ -189,7 +189,7 @@ Although it is not the typical use case, the new setup allows for different user
 
 #### Setup
 
-1. Create an OAuth 2.0 client in the [Google Cloud Console](https://console.cloud.google.com/apis/credentials) (type: **Desktop app**).
+1. Create an OAuth 2.0 client in the [Google Cloud Console](https://console.cloud.google.com/apis/credentials) (type: **Desktop app**). The Desktop-app type is what allows the server to use arbitrary loopback ports (`http://127.0.0.1:<port>`) as the redirect target without pre-registration.
 2. Enable the Gmail, Drive, and Calendar APIs for your project.
 3. Set the env vars:
 
@@ -200,37 +200,36 @@ EXTAPI_GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
 
 #### Auth flow
 
+The flow uses Google's current, supported pattern for installed apps: a **loopback IP redirect** with **PKCE**. (The previous OOB / copy-paste flow was deprecated by Google.) The server is the one receiving the redirect, so you never have to copy an auth code by hand.
+
 ```bash
 # 1. Get the Google consent URL
 curl http://localhost:11583/google/auth/login
 # → {"auth_url": "https://accounts.google.com/o/oauth2/v2/auth?..."}
 
 # 2. Open the URL in a browser and complete consent.
-#    Google displays an authorization code on screen. Copy it.
+#    Google will redirect back to http://127.0.0.1:11583/google/auth/callback
+#    and the server will render a small HTML page containing your session_id.
 
-# 3. Send the code to the callback endpoint
-curl -X POST http://localhost:11583/google/auth/callback \
-  -H "Content-Type: application/json" \
-  -d '{"code": "4/0AbC..."}'
-# → {"session_id": "abc123...", "user_email": "user@company.com", "expires_at": "..."}
-
-# 4. Use the session on any Google endpoint
+# 3. Use the session on any Google endpoint
 curl -H "X-Google-Session-Id: abc123..." http://localhost:11583/gmail/messages
 curl -H "X-Google-Session-Id: abc123..." http://localhost:11583/gdrive/files
 curl -H "X-Google-Session-Id: abc123..." http://localhost:11583/gcalendar/calendars
 
-# 5. Check session info
+# 4. Check session info
 curl http://localhost:11583/google/auth/session/abc123...
 
-# 6. Logout (delete session)
+# 5. Logout (delete session)
 curl -X DELETE http://localhost:11583/google/auth/session/abc123...
 ```
+
+The browser you consent in must be able to reach the extapi server at `http://{EXTAPI_HOST}:{EXTAPI_PORT}`. If the server is bound to `0.0.0.0`, the redirect URI substitutes `127.0.0.1` — so run the browser on the same machine as the server (or forward the port).
 
 #### Auth endpoints
 
 ```
-GET    /google/auth/login                 # Returns {"auth_url": "..."} for Google consent screen
-POST   /google/auth/callback              # Exchanges auth code for tokens, creates session (body: {"code": "..."})
+GET    /google/auth/login                 # Returns {"auth_url": "..."} for Google consent screen (includes state + PKCE challenge)
+GET    /google/auth/callback              # Google redirects here (?code=&state=); server exchanges and shows session_id
 GET    /google/auth/session/{id}          # Session info (email, expiry, scopes) — no tokens exposed
 DELETE /google/auth/session/{id}          # Delete session (logout)
 ```

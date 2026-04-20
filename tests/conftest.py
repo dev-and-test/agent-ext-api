@@ -3,6 +3,7 @@ import httpx
 import respx
 from httpx import ASGITransport
 
+from extapi.google_auth import init_google_auth_db
 from extapi.main import app
 from extapi.review_queue import init_db
 from extapi.settings import Settings
@@ -15,6 +16,7 @@ async def client():
 
     # Use in-memory SQLite for tests
     app.state.review_db = await init_db(":memory:")
+    app.state.google_auth_db = await init_google_auth_db(":memory:")
 
     with respx.mock(assert_all_called=False, assert_all_mocked=False) as mock:
         app.state.jira_client = httpx.AsyncClient(
@@ -59,3 +61,4 @@ async def client():
         await app.state.gdrive_client.aclose()
         await app.state.gcalendar_client.aclose()
         await app.state.review_db.close()
+        await app.state.google_auth_db.close()
