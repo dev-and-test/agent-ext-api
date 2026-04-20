@@ -9,7 +9,7 @@ import structlog
 
 logger = structlog.get_logger()
 
-_CREATE_TABLE = """
+_CREATE_SESSIONS_TABLE = """
 CREATE TABLE IF NOT EXISTS google_sessions (
     session_id    TEXT PRIMARY KEY,
     user_email    TEXT NOT NULL,
@@ -22,13 +22,56 @@ CREATE TABLE IF NOT EXISTS google_sessions (
 );
 """
 
+_CREATE_STATES_TABLE = """
+CREATE TABLE IF NOT EXISTS google_oauth_states (
+    state         TEXT PRIMARY KEY,
+    code_verifier TEXT NOT NULL,
+    created_at    TEXT NOT NULL
+);
+"""
+
+_OAUTH_STATE_TTL = timedelta(minutes=10)
+
 
 async def init_google_auth_db(path: str) -> aiosqlite.Connection:
     db = await aiosqlite.connect(path)
     db.row_factory = aiosqlite.Row
-    await db.execute(_CREATE_TABLE)
+    await db.execute(_CREATE_SESSIONS_TABLE)
+    await db.execute(_CREATE_STATES_TABLE)
     await db.commit()
     return db
+
+
+async def store_oauth_state(
+    db: aiosqlite.Connection, state: str, code_verifier: str
+) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    await db.execute(
+        "INSERT INTO google_oauth_states (state, code_verifier, created_at) VALUES (?, ?, ?)",
+        (state, code_verifier, now),
+    )
+    await db.commit()
+
+
+async def consume_oauth_state(db: aiosqlite.Connection, state: str) -> str | None:
+    """Look up and delete the stored code_verifier for a state. Single-use.
+
+    Also prunes entries older than the TTL to keep the table bounded.
+    """
+    cutoff = (datetime.now(timezone.utc) - _OAUTH_STATE_TTL).isoformat()
+    await db.execute(
+        "DELETE FROM google_oauth_states WHERE created_at < ?", (cutoff,)
+    )
+    async with db.execute(
+        "SELECT code_verifier FROM google_oauth_states WHERE state = ?", (state,)
+    ) as cur:
+        row = await cur.fetchone()
+    if row is None:
+        await db.commit()
+        return None
+    await db.execute("DELETE FROM google_oauth_states WHERE state = ?", (state,))
+    await db.commit()
+    return row["code_verifier"]
 
 
 async def create_session(
