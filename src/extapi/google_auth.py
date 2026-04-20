@@ -63,15 +63,12 @@ async def consume_oauth_state(db: aiosqlite.Connection, state: str) -> str | Non
         "DELETE FROM google_oauth_states WHERE created_at < ?", (cutoff,)
     )
     async with db.execute(
-        "SELECT code_verifier FROM google_oauth_states WHERE state = ?", (state,)
+        "DELETE FROM google_oauth_states WHERE state = ? RETURNING code_verifier",
+        (state,),
     ) as cur:
         row = await cur.fetchone()
-    if row is None:
-        await db.commit()
-        return None
-    await db.execute("DELETE FROM google_oauth_states WHERE state = ?", (state,))
     await db.commit()
-    return row["code_verifier"]
+    return row["code_verifier"] if row else None
 
 
 async def create_session(
